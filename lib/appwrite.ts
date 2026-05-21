@@ -47,6 +47,11 @@ const isActiveSessionError = (error: unknown) =>
   error instanceof AppwriteException &&
   error.message.includes("session is active");
 
+const isDuplicateUserError = (error: unknown) =>
+  error instanceof AppwriteException &&
+  error.code === 409 &&
+  error.message.includes("already exists");
+
 export const getCurrentAccount = async (): Promise<AuthenticatedAccount | null> => {
   try {
     return await account.get();
@@ -63,10 +68,38 @@ export const createUser = async ({
   name,
 }: CreateUserParams) => {
   try {
-    const newAccount = await account.create(ID.unique(), email, password, name);
+    let accountId: string;
 
-    if (!newAccount) throw new Error();
+    try {
+      const newAccount = await account.create(ID.unique(), email, password, name);
+      if (!newAccount) throw new Error("Failed to create account");
+      accountId = newAccount.$id;
+    } catch (createError) {
+      if (!isDuplicateUserError(createError)) {
+        throw createError;
+      }
 
+      // Auth account already exists — attempt to sign in and recover
+      await signIn({ email, password });
+
+      const existingUser = await getCurrentUser();
+      if (existingUser) {
+        // Fully registered user — direct them to sign in instead
+        throw new Error(
+          "An account with this email already exists. Please sign in instead.",
+        );
+      }
+
+      // Orphaned auth account (no user document) — get the account ID and
+      // fall through to create the missing document
+      const currentAccount = await getCurrentAccount();
+      if (!currentAccount) {
+        throw new Error("Failed to recover existing account. Please try again.");
+      }
+      accountId = currentAccount.$id;
+    }
+
+    // Ensure we have an active session (no-op if signIn was already called above)
     await signIn({ email, password });
 
     const avatarUrl = await avatar.getInitials(name);
@@ -76,7 +109,7 @@ export const createUser = async ({
       appwriteConfig.userCollectionId,
       ID.unique(),
       {
-        accountId: newAccount.$id,
+        accountId,
         email,
         name,
         password,
