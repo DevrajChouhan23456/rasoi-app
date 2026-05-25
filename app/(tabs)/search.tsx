@@ -1,12 +1,86 @@
-import { View, Text } from 'react-native'
-import React from 'react'
-
+import { View, Text, Button, FlatList } from "react-native";
+import React, { useEffect } from "react";
+import seed from "@/lib/seed";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getMenu, getCategories } from "@/lib/appwrite";
+import useAppwrite from "@/lib/useAppwrite";
+import useLocalSeachParams, { useLocalSearchParams } from "expo-router";
+import CartButton from "@/components/cartButton";
+import cn from "clsx";
+import { MenuItem } from "@/type";
+import MenuCard from "@/components/MenuCard";
+import SearchBar from "@/components/SearchBar";
+import Fliters from "@/components/Fliters";
 const Search = () => {
-  return (
-    <View>
-      <Text>search</Text>
-    </View>
-  )
-}
+  const { query, category } = useLocalSearchParams<{
+    query: string;
+    category: string;
+  }>();
 
-export default Search
+  const { data, refetch, loading } = useAppwrite({
+    fn: getMenu,
+    params: {
+      category,
+      query,
+      limit: 6,
+    },
+  });
+
+  const { data: categories } = useAppwrite({ fn: getCategories });
+
+  useEffect(() => {
+    refetch({
+      category,
+      query,
+      limit: 6,
+    });
+  }, [query, category]);
+  return (
+    <SafeAreaView>
+      <FlatList
+        data={data}
+        renderItem={({ item, index }) => {
+          const isFirstRightColItem = index % 2 === 0;
+          return (
+            <View
+              className={cn(
+                "flex-1 max-w-[48]",
+                !isFirstRightColItem ? "mt-10" : "mt-0",
+              )}
+            >
+              <MenuCard item={item as MenuItem} />
+            </View>
+          );
+        }}
+        keyExtractor={(item) => item.$id}
+        numColumns={2}
+        columnWrapperClassName="gap-7"
+        contentContainerClassName="gap-7 px-5 pb-32"
+        ListHeaderComponent={() => {
+          <View className="my-5 gap-5">
+            <View className="flex-between flex-row w-full ">
+              <View className="flex-start">
+                <Text className={"small-bold upppercase text-primary"}>
+                  Search
+                </Text>
+                <View className="flex-start flex-row gap-x-1 mt-0.5">
+                  <Text className="paragraph-semibold text-dark-100">
+                    Find Your Favourite Food
+                  </Text>
+                </View>
+              </View>
+              <CartButton />
+            </View>
+            <SearchBar />
+            <Fliters categories={categories!} />
+
+            <Text>Filter</Text>
+          </View>;
+        }}
+        ListEmptyComponent={() => !loading && <Text>No results</Text>}
+      />
+    </SafeAreaView>
+  );
+};
+
+export default Search;

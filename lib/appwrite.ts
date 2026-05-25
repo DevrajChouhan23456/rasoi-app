@@ -1,4 +1,4 @@
-import { CreateUserParams, SignInParams, User } from "@/type";
+import { Category, CreateUserParams, GetMenuParams, MenuItem, SignInParams, User } from "@/type";
 import {
   Account,
   AppwriteException,
@@ -8,6 +8,7 @@ import {
   ID,
   Models,
   Query,
+  Storage
 } from "react-native-appwrite";
 
 export const appwriteConfig = {
@@ -15,7 +16,13 @@ export const appwriteConfig = {
   Platform: "com.rasoi",
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
   databaseId: "6a09ecbf0019d7ab7a3b",
+  bucketId:"6a101c07001670da4fb8",
   userCollectionId: "user",
+  categoriesCollectionId:"categories",
+  menuCollectionId:"menu",
+  customizationsCollectionId:"customizations",
+  menuCustomizationsCollectionId:"menu_customizations",
+
 };
 
 export const client = new Client();
@@ -27,6 +34,7 @@ client
 
 export const account = new Account(client);
 export const databases = new Databases(client);
+export const storage = new Storage(client);
 export const avatar = new Avatars(client);
 
 type AuthenticatedAccount = Models.User<Models.Preferences>;
@@ -137,5 +145,43 @@ export const getCurrentUser = async (accountId?: string): Promise<User | null> =
     if (isMissingAccountScopeError(error)) return null;
 
     throw new Error(getErrorMessage(error, "Failed to fetch current user"));
+  }
+};
+
+
+export const getMenu = async ({ category, query }: GetMenuParams): Promise<MenuItem[]> => {
+  try {
+    const queries: string[] = [];
+
+    if (category && category !== "All") {
+      queries.push(Query.equal("categories", category));
+    }
+
+    if (query) {
+      queries.push(Query.search("name", query));
+    }
+
+    const menus = await databases.listDocuments<MenuItem>(
+      appwriteConfig.databaseId,
+      appwriteConfig.menuCollectionId,
+      queries,
+    );
+
+    return menus.documents;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Failed to fetch menu"));
+  }
+};
+
+export const getCategories = async (): Promise<Category[]> => {
+  try {
+    const categories = await databases.listDocuments<Category>(
+      appwriteConfig.databaseId,
+      appwriteConfig.categoriesCollectionId,
+    );
+
+    return categories.documents;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Failed to fetch categories"));
   }
 };
