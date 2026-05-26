@@ -35,8 +35,20 @@ const SignUp = () => {
       await fetchAuthenticatedUser();
       router.replace("/");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
-      sentry.captureException(error);
+      const isAlreadyExists = error.message?.includes("already exists");
+      if (isAlreadyExists) {
+        Alert.alert(
+          "Account Exists",
+          "An account with this email already exists. Would you like to sign in instead?",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Sign In", onPress: () => router.replace("/sign-in") },
+          ],
+        );
+      } else {
+        Alert.alert("Error", error.message);
+        sentry.captureException(error);
+      }
     } finally {
       setIsSubmitting(false);
     }
